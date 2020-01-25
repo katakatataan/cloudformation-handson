@@ -1,0 +1,286 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+
+
+Description: >
+  This template shows how to use AWS CodePipeline and AWS CodeBuild to build an
+  automated continuous deployment pipeline to Amazon Elastic Container Service
+  (Amazon ECS) using clusters powered by AWS Fargate or Amazon Elastic Compute
+  Cloud (Amazon EC2).
+Parameters:
+  ServiceName:
+    Type: String
+    Default: api
+
+  ProjectName:
+    Type: String
+
+  EnvironmentName:
+    Default: dev
+    Description: Environment name, either dev or prod.
+    Type: String
+    MinLength: 1
+    MaxLength: 255
+    AllowedValues:
+      - dev
+      - prod
+    ConstraintDescription: Specify either dev or prod
+
+  LaunchType:
+    Type: String
+    Default: EC2
+    AllowedValues:
+      - Fargate
+      - EC2
+    Description: >
+      The launch type for your service. Selecting EC2 will create an Auto
+      Scaling group of t2.micro instances for your cluster. See
+      https://docs.aws.amazon.com/AmazonECS/latest/developerguide/launch_types.html
+      to learn more about launch types.
+
+  GitHubUser:
+    Type: String
+    Default: "katakatataan"
+    Description: Your username on GitHub.
+
+
+  GitHubRepo:
+    Type: String
+    Default: "residential_map_api"
+    Description: The repo name of the sample service.
+
+  GitHubBranch:
+    Type: String
+    Default: master
+    Description: The branch of the repo to continuously deploy.
+
+  GitHubToken:
+    NoEcho: true
+    Type: AWS::SSM::Parameter::Value<String>
+    Description: >
+      Token for the user specified above. (https://github.com/settings/tokens)
+
+  KeyPairName:
+    Type: String
+    Description: >
+      key pair mainly for ec2 instance
+
+  StackType:
+    Description: node, rails, python, python3 or spring
+    Default: Docker
+    Type: String
+    MinLength: 1
+    MaxLength: 255
+    ConstraintDescription: Specify node, rails, python, python3 or spring
+
+  AppS3Bucket:
+    Description: S3 Bucket containing your application package.
+    Type: String
+    MinLength: 1
+    MaxLength: 255
+
+  AppS3Key:
+    Default: sample.zip
+    Description: S3 Bucket key for your application package
+    Type: String
+    MinLength: 1
+    MaxLength: 255
+
+  DevInstanceType:
+    Description: The instance type for the dev environment
+    Type: String
+    MinLength: 1
+    MaxLength: 255
+    Default: t3.micro
+
+  ProdInstanceType:
+    Description: The instance type for the prod environment
+    Type: String
+    MinLength: 1
+    MaxLength: 255
+    Default: t2.large
+
+  SSLCertificateArn:
+    Description: The SSL/TLS certificate ARN
+    Type: String
+    MinLength: 0
+    MaxLength: 2048
+    Default: ""
+
+  AutoScalingMinInstanceCount:
+    Description: Minimum number of EC2 instances for Auto Scaling
+    Type: Number
+    MinValue: 1
+    MaxValue: 20
+    Default: 1
+    ConstraintDescription: Specify a number between 1 - 20
+
+  AutoScalingMaxInstanceCount:
+    Description: Maximum number of EC2 instances for Auto Scaling
+    Type: Number
+    MinValue: 1
+    MaxValue: 20
+    Default: 1
+    ConstraintDescription: Specify a number between 1 - 20
+
+  DatabaseUser:
+    NoEcho: true
+    Type: AWS::SSM::Parameter::Value<String>
+    Description: Database admin account name
+    MinLength: 5
+    MaxLength: 16
+    AllowedPattern: "[a-zA-Z][a-zA-Z0-9_-]*"
+    ConstraintDescription: Name must begin with a letter and contain only alphanumeric characters
+
+  DatabasePassword:
+    NoEcho: true
+    Type: AWS::SSM::Parameter::Value<String>
+    Description: Database admin account password
+    MinLength: 6
+    MaxLength: 41
+    AllowedPattern: "[a-zA-Z0-9_-]*"
+    ConstraintDescription: Password must contain only alphanumeric characters
+
+  DatabaseName:
+    NoEcho: true
+    Type: AWS::SSM::Parameter::Value<String>
+    Description: Database name
+    MinLength: 1
+    MaxLength: 30
+    AllowedPattern: "[a-zA-Z][a-zA-Z0-9_-]*"
+    ConstraintDescription: Name must begin with a letter and contain only alphanumeric characters
+
+  LoadBalancerDomainName:
+    Type: String
+    Description: Domain name to create an Amazon Route 53 alias record for the load balancer
+    AllowedPattern: "(^$|^((?!-)[A-Za-z0-9-]{1,63}(?<!-)\\.)+[A-Za-z]{2,6}$)" # Allow for a blank or a domain name
+    ConstraintDescription: Please enter a valid domain name
+
+Mappings:
+  ELBDomain:
+    us-east-1:
+      HostedZoneId: Z3DZXE0Q79N41H
+    us-west-2:
+      HostedZoneId: Z33MTJ483KN6FU
+    us-west-1:
+      HostedZoneId: Z1M58G0W56PQJA
+    eu-west-1:
+      HostedZoneId: Z3NF1Z3NOM5OY2
+    ap-southeast-1:
+      HostedZoneId: Z1WI8VXHPB1R38
+    ap-southeast-2:
+      HostedZoneId: Z2999QAZ9SRTIC
+    ap-northeast-1:
+      HostedZoneId: Z2YN17T5R711GT
+    sa-east-1:
+      HostedZoneId: Z2ES78Y61JGQKS
+
+Resources:
+
+  ElasticBeansTalk:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      Parameters:
+        KeyPairName: !Ref KeyPairName
+        ServiceName: !Ref ServiceName
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        StackType: !Ref StackType
+        AppS3Bucket: !Ref AppS3Bucket
+        AppS3Key: !Ref AppS3Key
+        DevInstanceType: !Ref DevInstanceType
+        ProdInstanceType: !Ref ProdInstanceType
+        SSLCertificateArn: !Ref SSLCertificateArn
+        AutoScalingMinInstanceCount: !Ref AutoScalingMinInstanceCount
+        AutoScalingMaxInstanceCount: !Ref AutoScalingMaxInstanceCount
+        ApiApplicationSecurityGroup: !GetAtt SG.Outputs.ApiApplicationSecurityGroup
+        ApiELBSecurityGroup: !GetAtt SG.Outputs.ApiELBSecurityGroup
+        BastionSecurityGroup:
+          Fn::ImportValue:
+            Fn::Sub: ${ProjectName}-${EnvironmentName}-BastionSecurityGroup
+        VpcId:
+          Fn::ImportValue:
+            Fn::Sub: ${ProjectName}-${EnvironmentName}-VpcId
+        DatabasePassword: !Ref DatabasePassword
+        DatabaseUser: !Ref DatabaseUser
+        DatabaseName: !Ref DatabaseName
+        RdsDbURL:
+          Fn::ImportValue:
+            Fn::Sub: ${ProjectName}-${EnvironmentName}-RdsDbURL
+        PrivateSubnet1a:
+          Fn::ImportValue:
+            Fn::Sub: ${ProjectName}-${EnvironmentName}-PrivateSubnet1a
+        PrivateSubnet1c:
+          Fn::ImportValue:
+            Fn::Sub: ${ProjectName}-${EnvironmentName}-PrivateSubnet1c
+        PublicSubnet1a:
+          Fn::ImportValue:
+            Fn::Sub: ${ProjectName}-${EnvironmentName}-PublicSubnet1a
+        PublicSubnet1c:
+          Fn::ImportValue:
+            Fn::Sub: ${ProjectName}-${EnvironmentName}-PublicSubnet1c
+      TemplateURL: ./eb.yml
+
+  DeploymentPipeline:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - ElasticBeansTalk
+    Properties:
+      Parameters:
+        LaunchType: !Ref LaunchType
+        ServiceName: !Ref ServiceName
+        ProjectName: !Ref ProjectName
+        ECRRepositoryName: !Sub ${ProjectName}-${ServiceName}-${EnvironmentName}
+        GitHubUser: !Ref GitHubUser
+        GitHubToken: !Ref GitHubToken
+        GitHubRepo: !Ref GitHubRepo
+        GitHubBranch: !Ref GitHubBranch
+        EnvironmentName: !Sub ${ProjectName}-${ServiceName}-${EnvironmentName}
+        ApplicationName: !Sub ${ProjectName}-${ServiceName}-${EnvironmentName}
+      TemplateURL: ./deployment-pipeline.yml
+
+  DNS:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - DeploymentPipeline
+    Properties:
+      Parameters:
+        LoadBalancerDomainName: !Ref LoadBalancerDomainName
+        HostedZoneName:
+          Fn::ImportValue:
+            Fn::Sub: ${ProjectName}-${EnvironmentName}-PrivateDomainName
+        HostedZoneId: !FindInMap
+          - ELBDomain
+          - !Ref 'AWS::Region'
+          - HostedZoneId
+        DNSName: !GetAtt ElasticBeansTalk.Outputs.EnvironmentURL
+      TemplateURL: ./route53.yml
+
+  SG:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      Parameters:
+        ServiceName: !Ref ServiceName
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+      TemplateURL: ./sg.yml
+
+Outputs:
+  # ServiceUrl:
+  #   Description: The sample service that is being continuously deployed.
+  #   Value: !GetAtt LoadBalancer.Outputs.ServiceUrl
+
+  PipelineUrl:
+    Description: The continuous deployment pipeline in the AWS Management Console.
+    Value: !GetAtt DeploymentPipeline.Outputs.PipelineUrl
+
+  ApiApplicationSecurityGroup:
+    Value: !GetAtt SG.Outputs.ApiApplicationSecurityGroup
+    Export:
+      Name: !Sub ${ProjectName}-${ServiceName}-${EnvironmentName}-ApiApplicationSecurityGroup
+
+  ApiELBSecurityGroup:
+    Value: !GetAtt SG.Outputs.ApiELBSecurityGroup
+    Export:
+      Name: !Sub ${ProjectName}-${ServiceName}-${EnvironmentName}-ApiELBSecurityGroup
+

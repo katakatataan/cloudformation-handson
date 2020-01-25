@@ -1,0 +1,31 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description:  SASKV5N Elastic Beanstalk
+
+# App stack creation prerequisites:  first create a VPC stack, then a DB stack.
+
+Parameters:
+
+  LoadBalancerDomainName:
+    Type: String
+
+  HostedZoneName:
+    Type: String
+
+  HostedZoneId:
+    Type: String
+
+  DNSName:
+    Type: String
+
+
+Resources:
+  AlbRoute53Record:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      Name: !Ref LoadBalancerDomainName
+      HostedZoneName: !Ref HostedZoneName
+      Type: A
+      AliasTarget:
+        HostedZoneId: !Ref HostedZoneId
+        DNSName: !Ref DNSName

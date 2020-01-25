@@ -1,0 +1,590 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+
+
+Parameters:
+  ProjectName:
+    Type: String
+
+  EnvironmentName:
+    Type: String
+    Description: Environment name - dev or prod
+    Default: dev
+    AllowedValues:
+      - dev
+      - prod
+    ConstraintDescription: Specify either dev or prod
+
+  VpcCIDR:
+    Type: String
+    Default: 172.21.0.0/16
+
+  PublicSubnet1aCIDR:
+    Type: String
+    Default: 172.21.0.0/24
+
+  PublicSubnet1cCIDR:
+    Type: String
+    Default: 172.21.1.0/24
+
+  PrivateSubnet1aCIDR:
+    Type: String
+    Default: 172.21.254.0/24
+
+  PrivateSubnet1cCIDR:
+    Type: String
+    Default: 172.21.255.0/24
+
+  PublicSubnetCIDR:
+    Type: String
+    Default: 172.21.0.0/23
+
+  PrivateSubnetCIDR:
+    Type: String
+    Default: 172.21.254.0/23
+
+  KeyPairName:
+    Type: String
+
+  NatInstanceImage:
+    Type: String
+    Default: ami-00d29e4cb217ae06b
+
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCIDR
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-${EnvironmentName}-vpc
+
+  BastionEIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      InstanceId: !Ref BastionNatInstance
+      Domain: !Ref VPC
+
+  IGW:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-${EnvironmentName}-rm-igw
+
+  VpcIgwAttach:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref IGW
+
+
+  PublicSubnet1a:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PublicSubnet1aCIDR
+      AvailabilityZone: ap-northeast-1a
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-${EnvironmentName}-public-1a
+
+  PublicSubnet1c:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PublicSubnet1cCIDR
+      AvailabilityZone: ap-northeast-1c
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-${EnvironmentName}-public-1c
+
+  PrivateSubnet1a:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PrivateSubnet1aCIDR
+      AvailabilityZone: ap-northeast-1a
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-${EnvironmentName}-private-1a
+
+  PrivateSubnet1c:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PrivateSubnet1cCIDR
+      AvailabilityZone: ap-northeast-1c
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-${EnvironmentName}-private-1c
+
+
+  PublicSubnetRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-${EnvironmentName}-public-igw
+
+  PrivateSubnetRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-${EnvironmentName}-private-nat
+
+
+  RouteTableAssociationPublicA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet1a
+      RouteTableId: !Ref PublicSubnetRouteTable
+
+  RouteTableAssociationPublicC:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet1c
+      RouteTableId: !Ref PublicSubnetRouteTable
+
+
+  RouteTableAssociationPrivateA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet1a
+      RouteTableId: !Ref PrivateSubnetRouteTable
+
+  RouteTableAssociationPrivateC:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet1c
+      RouteTableId: !Ref PrivateSubnetRouteTable
+
+
+  RouteTableIGWAssociation:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      RouteTableId: !Ref PublicSubnetRouteTable
+      GatewayId: !Ref IGW
+
+
+  RouteTableNatInstanceAssociation:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      RouteTableId: !Ref PrivateSubnetRouteTable
+      InstanceId: !Ref BastionNatInstance
+
+
+  AclPublic:
+    Type: AWS::EC2::NetworkAcl
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-${EnvironmentName}-public
+
+  AclPrivate:
+    Type: AWS::EC2::NetworkAcl
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-${EnvironmentName}-private
+
+
+  AclPublicInSsh:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      CidrBlock: 0.0.0.0/0
+      Egress: false
+      Protocol: 6
+      PortRange:
+        From: 22
+        To: 22
+      RuleAction: allow
+      RuleNumber: 100
+      NetworkAclId: !Ref AclPublic
+
+  AclPublicInHttp:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      CidrBlock: 0.0.0.0/0
+      Egress: false
+      Protocol: 6
+      PortRange:
+        From: 80
+        To: 80
+      RuleAction: allow
+      RuleNumber: 200
+      NetworkAclId: !Ref AclPublic
+
+  AclPublicInHttps:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      CidrBlock: 0.0.0.0/0
+      Egress: false
+      Protocol: 6
+      PortRange:
+        From: 443
+        To: 443
+      RuleAction: allow
+      RuleNumber: 300
+      NetworkAclId: !Ref AclPublic
+
+  AclPublicEphemeralIn:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      CidrBlock: 0.0.0.0/0
+      Egress: false
+      Protocol: 6
+      PortRange:
+        From: 1024
+        To: 65535
+      RuleAction: allow
+      RuleNumber: 400
+      NetworkAclId: !Ref AclPublic
+
+  AclPublicIn:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      CidrBlock: !Ref PublicSubnetCIDR
+      Egress: false
+      Protocol: -1
+      RuleAction: allow
+      RuleNumber: 500
+      NetworkAclId: !Ref AclPublic
+
+  AclPublicFromPrivate:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      CidrBlock: !Ref PrivateSubnetCIDR
+      Egress: false
+      Protocol: -1
+      RuleAction: allow
+      RuleNumber: 510
+      NetworkAclId: !Ref AclPublic
+
+
+  AclPublicOutSsh:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      CidrBlock: 0.0.0.0/0
+      Egress: true
+      Protocol: 6
+      PortRange:
+        From: 22
+        To: 22
+      RuleAction: allow
+      RuleNumber: 100
+      NetworkAclId: !Ref AclPublic
+
+  AclPublicOutHttp:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      CidrBlock: 0.0.0.0/0
+      Egress: true
+      Protocol: 6
+      PortRange:
+        From: 80
+        To: 80
+      RuleAction: allow
+      RuleNumber: 200
+      NetworkAclId: !Ref AclPublic
+
+  AclPublicOutHttps:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      CidrBlock: 0.0.0.0/0
+      Egress: true
+      Protocol: 6
+      PortRange:
+        From: 443
+        To: 443
+      RuleAction: allow
+      RuleNumber: 300
+      NetworkAclId: !Ref AclPublic
+
+  AclPublicEphemeralOut:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      CidrBlock: 0.0.0.0/0
+      Egress: true
+      Protocol: 6
+      PortRange:
+        From: 1024
+        To: 65535
+      RuleAction: allow
+      RuleNumber: 400
+      NetworkAclId: !Ref AclPublic
+
+  AclPublicToPublicOut:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      CidrBlock: !Ref PublicSubnetCIDR
+      Egress: true
+      Protocol: -1
+      RuleAction: allow
+      RuleNumber: 500
+      NetworkAclId: !Ref AclPublic
+
+
+  AclPrivateInSsh:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      CidrBlock: !Ref PublicSubnetCIDR
+      Egress: false
+      Protocol: 6
+      PortRange:
+        From: 22
+        To: 22
+      RuleAction: allow
+      RuleNumber: 100
+      NetworkAclId: !Ref AclPrivate
+
+  AclPrivateInHttp:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      CidrBlock: !Ref PublicSubnetCIDR
+      Egress: false
+      Protocol: 6
+      PortRange:
+        From: 80
+        To: 80
+      RuleAction: allow
+      RuleNumber: 200
+      NetworkAclId: !Ref AclPrivate
+
+  AclPrivateInHttps:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      CidrBlock: !Ref PublicSubnetCIDR
+      Egress: false
+      Protocol: 6
+      PortRange:
+        From: 443
+        To: 443
+      RuleAction: allow
+      RuleNumber: 300
+      NetworkAclId: !Ref AclPrivate
+
+  AclPrivateEphemeralIn:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      CidrBlock: 0.0.0.0/0
+      Egress: false
+      Protocol: 6
+      PortRange:
+        From: 1024
+        To: 65535
+      RuleAction: allow
+      RuleNumber: 400
+      NetworkAclId: !Ref AclPrivate
+
+
+  AclPrivateOutHttp:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      CidrBlock: 0.0.0.0/0
+      Egress: true
+      Protocol: 6
+      PortRange:
+        From: 80
+        To: 80
+      RuleAction: allow
+      RuleNumber: 200
+      NetworkAclId: !Ref AclPrivate
+
+  AclPrivateOutHttps:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      CidrBlock: 0.0.0.0/0
+      Egress: true
+      Protocol: 6
+      PortRange:
+        From: 443
+        To: 443
+      RuleAction: allow
+      RuleNumber: 300
+      NetworkAclId: !Ref AclPrivate
+
+  AclPrivateEphemeralOut:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      CidrBlock: 0.0.0.0/0
+      Egress: true
+      Protocol: 6
+      PortRange:
+        From: 1024
+        To: 65535
+      RuleAction: allow
+      RuleNumber: 400
+      NetworkAclId: !Ref AclPrivate
+
+  AclPrivateOut:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      CidrBlock: !Ref PublicSubnetCIDR
+      Egress: true
+      Protocol: -1
+      RuleAction: allow
+      RuleNumber: 500
+      NetworkAclId: !Ref AclPrivate
+
+
+  PublicSubnet1aAclAssociation:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet1a
+      NetworkAclId: !Ref AclPublic
+
+  PublicSubnet1cAclAssociation:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet1c
+      NetworkAclId: !Ref AclPublic
+
+
+  PrivateSubnet1aAclAssociation:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet1a
+      NetworkAclId: !Ref AclPrivate
+
+  PrivateSubnet1cAclAssociation:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet1c
+      NetworkAclId: !Ref AclPrivate
+
+  BastionNatInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      LaunchTemplate:
+        LaunchTemplateId: !Ref BastionNatInstanceLaunchTemplate
+        Version: !GetAtt BastionNatInstanceLaunchTemplate.LatestVersionNumber
+      SubnetId: !Ref PublicSubnet1a
+      SourceDestCheck: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-${EnvironmentName}-bastion-nat
+
+  BastionNatInstanceLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        SecurityGroupIds:
+          - !Ref BastionSecurityGroup
+          - !Ref NatSecurityGroup
+        InstanceInitiatedShutdownBehavior: stop
+        KeyName: !Ref KeyPairName
+        ImageId: !Ref NatInstanceImage
+        Monitoring:
+          Enabled: false
+        CreditSpecification:
+          CpuCredits: standard
+        InstanceType: t2.micro
+        BlockDeviceMappings:
+          - DeviceName: /dev/xvda
+            Ebs:
+              VolumeSize: 8
+              VolumeType: gp2
+              DeleteOnTermination: true
+
+  NatSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref VPC
+      GroupDescription: SG for Nat
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: !Ref PrivateSubnetCIDR
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: !Ref PrivateSubnetCIDR
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-${EnvironmentName}-nat-sg
+
+  BastionSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref VPC
+      GroupDescription: SG for Bastion
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-${EnvironmentName}-bastion-sg
+
+Outputs:
+  VpcId:
+    Description: VPC ID
+    Value: !Ref VPC
+    Export:
+      Name: !Sub ${ProjectName}-${EnvironmentName}-VpcId
+
+  PublicSubnets:
+    Description: PublicSubnets for ALB
+    Value: !Join [ ",", [ !Ref PublicSubnet1a, !Ref PublicSubnet1c ] ]
+    Export:
+      Name: !Sub ${ProjectName}-${EnvironmentName}-PublicSubnets
+
+  PrivateSubnets:
+    Description: PrivateSubnets for FargateService
+    Value: !Join [ ",", [ !Ref PrivateSubnet1a, !Ref PrivateSubnet1c ] ]
+    Export:
+      Name: !Sub ${ProjectName}-${EnvironmentName}-PrivateSubnets
+
+  PrivateSubnetCIDR:
+    Value: !Ref PrivateSubnetCIDR
+    Export:
+      Name: !Sub ${ProjectName}-${EnvironmentName}-PrivateSubnetCIDR
+
+  BastionNatInstance:
+    Description: Bastion Nat Instance
+    Value: !Ref BastionNatInstance
+    Export:
+      Name: !Sub ${ProjectName}-${EnvironmentName}-BastionNatInstance
+
+  PrivateSubnet1a:
+    Value: !Ref PrivateSubnet1a
+    Export:
+      Name: !Sub ${ProjectName}-${EnvironmentName}-PrivateSubnet1a
+
+  PrivateSubnet1c:
+    Value: !Ref PrivateSubnet1c
+    Export:
+      Name: !Sub ${ProjectName}-${EnvironmentName}-PrivateSubnet1c
+
+  PublicSubnet1a:
+    Value: !Ref PublicSubnet1a
+    Export:
+      Name: !Sub ${ProjectName}-${EnvironmentName}-PublicSubnet1a
+
+  PublicSubnet1c:
+    Value: !Ref PublicSubnet1c
+    Export:
+      Name: !Sub ${ProjectName}-${EnvironmentName}-PublicSubnet1c
+
+  NatSecurityGroup:
+    Value: !Ref NatSecurityGroup
+    Export:
+      Name: !Sub ${ProjectName}-${EnvironmentName}-NatSecurityGroup
+
+  BastionSecurityGroup:
+    Value: !Ref BastionSecurityGroup
+    Export:
+      Name: !Sub ${ProjectName}-${EnvironmentName}-BastionSecurityGroup

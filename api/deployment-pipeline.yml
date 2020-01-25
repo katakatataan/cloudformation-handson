@@ -1,0 +1,261 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+
+
+Parameters:
+  DockerImageVer:
+    Type: String
+    Default: aws/codebuild/docker:17.09.0
+
+  LaunchType:
+    Type: String
+    Default: EC2
+
+  GitHubRepo:
+    Type: String
+
+  GitHubBranch:
+    Type: String
+
+  GitHubToken:
+    Type: String
+    NoEcho: true
+
+  GitHubUser:
+    Type: String
+
+  ECRRepositoryName:
+    Type: String
+
+  ServiceName:
+    Type: String
+    Default: api
+
+  ProjectName:
+    Type: String
+
+  EnvironmentName:
+    Type: String
+
+  ApplicationName:
+    Type: String
+
+Resources:
+  Repository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Ref ECRRepositoryName
+
+  CodeBuildServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: codebuild-for-api
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Resource: "*"
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+              - Resource: !Sub arn:aws:s3:::${ArtifactBucket}/*
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:GetObjectVersion
+              - Resource: "*"
+                Effect: Allow
+                Action:
+                  - ecr:*
+
+  ArtifactBucket:
+    Type: AWS::S3::Bucket
+
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Artifacts:
+        Type: CODEPIPELINE
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: |
+          version: 0.2
+          phases:
+            pre_build:
+              commands:
+                - echo Logging in to Amazon ECR...
+                - $(aws ecr get-login --no-include-email --region ap-northeast-1)
+                - TAG=latest
+                - IMAGE_URI=${REPOSITORY_URI}:${TAG}
+            build:
+              commands:
+                - echo Build started on `date`
+                - echo Building the Docker image...
+                - docker build --build-arg AWS_DEFAULT_REGION=$AWS_REGION -t $IMAGE_REPO_NAME:$TAG .
+                - docker tag $IMAGE_REPO_NAME:$TAG $IMAGE_URI
+                # - sed -i -e "s/IMAGE_WITH_TAG/$IMAGE_URI/g" Dockerrun.aws.json
+            post_build:
+              commands:
+                - echo Build completed on `date`
+                - echo Pushing the Docker image...
+                - docker push ${IMAGE_URI}
+          artifacts:
+            files:
+              - Dockerrun.aws.json
+              - .ebextensions/**/*
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: !Ref DockerImageVer
+        Type: LINUX_CONTAINER
+        EnvironmentVariables:
+          - Name: AWS_REGION
+            Value: ap-northeast-1
+          - Name: REPOSITORY_URI
+            Value: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${Repository}
+          - Name: IMAGE_REPO_NAME
+            Value: !Sub ${Repository}
+      Name: !Sub ${ProjectName}-${ServiceName}-${EnvironmentName}
+      ServiceRole: !Ref CodeBuildServiceRole
+
+
+  CodePipelineServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - "codepipeline.amazonaws.com"
+                - "cloudformation.amazonaws.com"
+                - "ecs-tasks.amazonaws.com"
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: codepipeline-for-api
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Resource: "*"
+                Effect: Allow
+                Action:
+                  - codedeploy:CreateDeployment
+                  - codedeploy:GetApplicationRevision
+                  - codedeploy:GetDeployment
+                  - codedeploy:GetDeploymentConfig
+                  - codedeploy:RegisterApplicationRevision
+              - Resource: "*"
+                Effect: Allow
+                Action:
+                  - elasticbeanstalk:*
+                  - ec2:*
+                  - elasticloadbalancing:*
+                  - autoscaling:*
+                  - cloudwatch:*
+                  - s3:*
+                  - sns:*
+                  - cloudformation:*
+                  - rds:*
+                  - sqs:*
+                  - ecs:*
+                  - logs:*
+                  - iam:PassRole
+                  - codebuild:*
+              - Resource: "*"
+                Effect: Allow
+                Action:
+                  - lambda:invokefunction
+                  - lambda:listfunctions
+
+  # CloudFormationExecutionRole:
+  #   Type: AWS::IAM::Role
+  #   Properties:
+  #     Path: /
+  #     AssumeRolePolicyDocument:
+  #       Version: 2012-10-17
+  #       Statement:
+  #         - Effect: Allow
+  #           Principal:
+  #             Service:
+  #               - "codepipeline.amazonaws.com"
+  #               - "cloudformation.amazonaws.com"
+  #               - "ecs-tasks.amazonaws.com"
+  #           Action: sts:AssumeRole
+  #     Policies:
+  #       - PolicyName: cloudformation-for-batch
+  #         PolicyDocument:
+  #           Version: 2012-10-17
+  #           Statement:
+  #             - Resource: "*"
+  #               Effect: Allow
+  #               Action: "*"
+
+  Pipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      RoleArn: !GetAtt CodePipelineServiceRole.Arn
+      ArtifactStore:
+        Type: S3
+        Location: !Ref ArtifactBucket
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: App
+              ActionTypeId:
+                Category: Source
+                Owner: ThirdParty
+                Version: 1
+                Provider: GitHub
+              Configuration:
+                Owner: !Ref GitHubUser
+                Repo: !Ref GitHubRepo
+                Branch: !Ref GitHubBranch
+                OAuthToken: !Ref GitHubToken
+              OutputArtifacts:
+                - Name: !Ref ServiceName
+              RunOrder: 1
+        - Name: Build
+          Actions:
+            - Name: Build
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              Configuration:
+                ProjectName: !Ref CodeBuildProject
+              InputArtifacts:
+                - Name: !Ref ServiceName
+              OutputArtifacts:
+                - Name: BuildOutput
+              RunOrder: 1
+        - Name: Deploy
+          Actions:
+            - Name: Deploy
+              InputArtifacts:
+                - Name: BuildOutput
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: ElasticBeanstalk
+              Configuration:
+                ApplicationName: !Ref ApplicationName
+                EnvironmentName: !Ref EnvironmentName
+              RunOrder: 1
+
+Outputs:
+  PipelineUrl:
+    Value: !Sub https://console.aws.amazon.com/codepipeline/home?region=${AWS::Region}#/view/${Pipeline}

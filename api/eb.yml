@@ -1,0 +1,358 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description:  SASKV5N Elastic Beanstalk
+
+# App stack creation prerequisites:  first create a VPC stack, then a DB stack.
+
+Parameters:
+
+  ServiceName:
+    Type: String
+
+  StackType:
+    Type: String
+
+  EnvironmentName:
+    Type: String
+
+  AppS3Bucket:
+    Type: String
+
+  AppS3Key:
+    Type: String
+
+  KeyPairName:
+    Type: AWS::EC2::KeyPair::KeyName
+
+  ProjectName:
+    Type: String
+
+  DevInstanceType:
+    Type: String
+
+  ProdInstanceType:
+    Type: String
+
+  SSLCertificateArn:
+    Type: String
+
+  ApiApplicationSecurityGroup:
+    Type: String
+
+  BastionSecurityGroup:
+    Type: String
+
+  VpcId:
+    Type: String
+
+  AutoScalingMinInstanceCount:
+    Type: Number
+
+  AutoScalingMaxInstanceCount:
+    Type: Number
+
+  DatabasePassword:
+    Type: String
+
+  DatabaseUser:
+    Type: String
+
+  DatabaseName:
+    Type: String
+
+  RdsDbURL:
+    Type: String
+
+  PrivateSubnet1a:
+    Type: String
+
+  PrivateSubnet1c:
+    Type: String
+
+  PublicSubnet1a:
+    Type: String
+
+  PublicSubnet1c:
+    Type: String
+
+  ApiELBSecurityGroup:
+    Type: String
+
+Conditions:
+
+  CreateProdEnv: !Equals [ !Ref EnvironmentName, prod ]
+
+  TlsEnabled: !Not [ !Equals [ !Ref SSLCertificateArn, "" ] ]
+
+
+Resources:
+  ElasticBeanstalkServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      AssumeRolePolicyDocument: |
+        {
+          "Statement": [{
+            "Effect": "Allow",
+            "Principal": { "Service": [ "elasticbeanstalk.amazonaws.com" ]},
+            "Action": [ "sts:AssumeRole" ],
+            "Condition": {
+              "StringEquals": {
+                "sts:ExternalId": "elasticbeanstalk"
+              }
+            }
+          }]
+        }
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSElasticBeanstalkEnhancedHealth
+        - arn:aws:iam::aws:policy/service-role/AWSElasticBeanstalkService
+
+  Application:
+    Type: AWS::ElasticBeanstalk::Application
+    Properties:
+      ApplicationName: !Sub ${ProjectName}-${ServiceName}-${EnvironmentName}
+
+  ApplicationVersion:
+    Type: AWS::ElasticBeanstalk::ApplicationVersion
+    Properties:
+      ApplicationName: !Ref Application
+      SourceBundle:
+        S3Bucket: !Ref AppS3Bucket
+        S3Key: !Ref AppS3Key
+
+  Environment:
+    Type: AWS::ElasticBeanstalk::Environment
+    Properties:
+      EnvironmentName: !Sub ${ProjectName}-${ServiceName}-${EnvironmentName}
+      ApplicationName: !Ref Application
+      TemplateName: !Ref ConfigurationTemplate
+      VersionLabel: !Ref ApplicationVersion
+    DependsOn:
+      - ConfigurationTemplate
+      - ApplicationVersion
+
+  # The configuration template contains environment parameters such as those
+  # that relate to the autoscaling group (e.g. size, triggers), placement of
+  # resources in the VPC, load balancer setup, and environment variables
+  ConfigurationTemplate:
+    Type: AWS::ElasticBeanstalk::ConfigurationTemplate
+    Properties:
+      ApplicationName: !Ref Application
+      SolutionStackName: 64bit Amazon Linux 2018.03 v2.12.9 running Docker 18.06.1-ce
+      OptionSettings:
+
+      - Namespace: aws:elasticbeanstalk:environment
+        OptionName: EnvironmentType
+        Value: LoadBalanced
+
+      - Namespace: aws:elasticbeanstalk:environment
+        OptionName: LoadBalancerType
+        Value: application
+
+      - Namespace: aws:elasticbeanstalk:environment
+        OptionName: ServiceRole
+        Value: !Ref ElasticBeanstalkServiceRole
+
+        # AUTOSCALING OPTIONS
+      - Namespace: aws:autoscaling:asg
+        OptionName: MinSize
+        Value: !Ref AutoScalingMinInstanceCount
+
+      - Namespace: aws:autoscaling:asg
+        OptionName: MaxSize
+        Value: !Ref AutoScalingMaxInstanceCount
+
+      - Namespace: aws:autoscaling:launchconfiguration
+        OptionName: SecurityGroups
+        Value: !Ref ApiApplicationSecurityGroup
+
+      - Namespace: aws:autoscaling:launchconfiguration
+        OptionName: SSHSourceRestriction
+        Value:
+          "Fn::Join":
+          - ','
+          - - 'tcp, 22, 22'
+            - !Ref BastionSecurityGroup
+
+      - Namespace: aws:autoscaling:launchconfiguration
+        OptionName: InstanceType
+        Value: !If [ CreateProdEnv, !Ref ProdInstanceType, !Ref DevInstanceType ]
+
+      - Namespace: aws:autoscaling:launchconfiguration
+        OptionName: IamInstanceProfile
+        Value: !Ref AppInstanceProfile
+
+      - Namespace: aws:autoscaling:launchconfiguration
+        OptionName: EC2KeyName
+        Value: !Ref KeyPairName
+
+      - Namespace: aws:autoscaling:updatepolicy:rollingupdate
+        OptionName: RollingUpdateEnabled
+        Value: true
+
+      - Namespace: aws:autoscaling:updatepolicy:rollingupdate
+        OptionName: RollingUpdateType
+        Value: Health
+
+      - Namespace: aws:autoscaling:trigger
+        OptionName: MeasureName
+        Value: CPUUtilization
+
+      - Namespace: aws:autoscaling:trigger
+        OptionName: Unit
+        Value: Percent
+
+      - Namespace: aws:autoscaling:trigger
+        OptionName: UpperThreshold
+        Value: 80
+
+      - Namespace: aws:autoscaling:trigger
+        OptionName: LowerThreshold
+        Value: 40
+
+        # VPC OPTIONS (PLACEMENT OF RESOURCES IN SUBNETS)
+      - Namespace: aws:ec2:vpc
+        OptionName: VPCId
+        Value: !Ref VpcId
+
+      - Namespace: aws:ec2:vpc
+        OptionName: ELBScheme
+        Value: internal
+
+      - Namespace: aws:ec2:vpc
+        OptionName: Subnets
+        Value:
+          "Fn::Join":
+          - ','
+          - - !Ref PrivateSubnet1a
+            - !Ref PrivateSubnet1c
+
+      - Namespace: aws:ec2:vpc
+        OptionName: ELBSubnets
+        Value:
+          "Fn::Join":
+          - ','
+          - - !Ref PublicSubnet1a
+            - !Ref PublicSubnet1c
+
+      - Namespace: aws:elbv2:listener:default
+        OptionName: ListenerEnabled
+        Value: !If [ TlsEnabled, false, true ]
+
+      - Namespace: aws:elbv2:loadbalancer
+        OptionName: SecurityGroups
+        Value:
+          "Fn::Join":
+          - ','
+          - - !Ref ApiELBSecurityGroup
+
+      - Namespace: aws:elbv2:loadbalancer
+        OptionName: ManagedSecurityGroup
+        Value: !Ref ApiELBSecurityGroup
+
+      - Namespace: aws:elbv2:listenerrule:default
+        OptionName: PathPatterns
+        Value: "/*"
+
+      - Namespace: !Sub
+        - "aws:elbv2:listener:${ListenPort}"
+        - ListenPort: 80
+        OptionName: Protocol
+        Value: HTTP
+
+
+      # - Namespace: !Sub
+      #   - "aws:elbv2:listener:${ListenPort}"
+      #   - ListenPort:
+      #       "Fn::ImportValue": !Sub "${NetworkStackName}-ELBIngressPort"
+      #   OptionName: SSLCertificateArns
+      #   Value: !Ref SSLCertificateArn
+
+        # CLOUDWATCH LOGS
+      - Namespace: aws:elasticbeanstalk:cloudwatch:logs
+        OptionName: StreamLogs
+        Value: true
+
+      - Namespace: aws:elasticbeanstalk:cloudwatch:logs
+        OptionName: DeleteOnTerminate
+        Value: true
+
+      - Namespace: aws:elasticbeanstalk:application
+        OptionName: Application Healthcheck URL
+        Value: /health
+
+      # ENVIRONMENT VARIABLES - COMMON TO ALL STACKS
+      - Namespace: aws:elasticbeanstalk:application:environment
+        OptionName: AWS_REGION
+        Value: !Ref AWS::Region
+
+          # ENVIRONMENT VARIABLES - NODE, RAILS - Move to parameter store
+      - Namespace: aws:elasticbeanstalk:application:environment
+        OptionName: DATABASE_PASSWORD
+        Value: !Ref DatabasePassword
+
+      - Namespace: aws:elasticbeanstalk:application:environment
+        OptionName: DATABASE_USER
+        Value: !Ref DatabaseUser
+
+      - Namespace: aws:elasticbeanstalk:application:environment
+        OptionName: DATABASE_NAME
+        Value: !Ref DatabaseName
+
+      - Namespace: aws:elasticbeanstalk:application:environment
+        OptionName: DATABASE_HOST
+        Value: !Ref RdsDbURL
+
+  # IAM resources
+  AppRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          -
+            Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSElasticBeanstalkWebTier
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess
+
+  AppPolicies:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: App
+      Roles:
+      - !Ref AppRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          -
+            Effect: Allow
+            Action: "*"
+            Resource: "*"
+
+  AppInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles:
+      - !Ref AppRole
+
+Outputs:
+
+  EnvironmentURL:
+    Description: Environment URL
+    Value: !GetAtt Environment.EndpointURL
+    Export:
+      Name: !Sub "${ProjectName}-${ServiceName}-${EnvironmentName}-EnvironmentURL"
+
+  TypeOfStack:
+    Description: Stack type
+    Value: !Ref StackType
+    Export:
+      Name: !Sub ${ProjectName}-${ServiceName}-${EnvironmentName}-TypeOfStack

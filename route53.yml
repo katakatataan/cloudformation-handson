@@ -1,0 +1,55 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+  DomainName:
+    Type: String
+    Default: public-cloudformation-handson.com.
+
+  PrivateDomainName:
+    Type: String
+    Default: private-cloudformation-handson.com.
+
+  ProjectName:
+    Type: String
+
+  EnvironmentName:
+    Type: String
+    Description: Environment name - dev or prod
+    Default: dev
+    AllowedValues:
+      - dev
+      - prod
+    ConstraintDescription: Specify either dev or prod
+
+Resources:
+  DnsServer:
+    Type: AWS::Route53::HostedZone
+    Properties:
+      HostedZoneConfig:
+        Comment: "My hosted zone for sumainoiroha.com"
+      Name: !Ref DomainName
+
+  PrivateDnsServer:
+    Type: AWS::Route53::HostedZone
+    Properties:
+      HostedZoneConfig:
+        Comment: "My hosted zone for sumainoiroha.com"
+      VPCs:
+        -
+          VPCId:
+            Fn::ImportValue:
+              Fn::Sub: ${ProjectName}-${EnvironmentName}-VpcId
+          VPCRegion: !Ref AWS::Region
+      Name: !Ref PrivateDomainName
+
+Outputs:
+  PrivateDomainName:
+    Value: !Ref PrivateDomainName
+    Export:
+      Name: !Sub ${ProjectName}-${EnvironmentName}-PrivateDomainName
+
+  PublicDomainName:
+    Value: !Ref DomainName
+    Export:
+      Name: !Sub ${ProjectName}-${EnvironmentName}-PublicDomainName

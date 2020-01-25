@@ -1,0 +1,90 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+  ServiceName:
+    Type: String
+    Default: api
+
+  ProjectName:
+    Type: String
+
+  EnvironmentName:
+    Default: dev
+    Description: Environment name, either dev or prod.
+    Type: String
+    MinLength: 1
+    MaxLength: 255
+    AllowedValues:
+      - dev
+      - prod
+    ConstraintDescription: Specify either dev or prod
+
+Resources:
+  ApiApplicationSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub ${ProjectName}-${ServiceName}-${EnvironmentName}-hosts
+      VpcId:
+        Fn::ImportValue:
+          Fn::Sub: ${ProjectName}-${EnvironmentName}-VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          SourceSecurityGroupId:
+            Fn::ImportValue:
+              Fn::Sub: ${ProjectName}-${EnvironmentName}-BastionSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId:
+            Fn::ImportValue:
+              Fn::Sub: ${ProjectName}-${EnvironmentName}-NatSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          SourceSecurityGroupId: !Ref ApiELBSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref ApiELBSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-${ServiceName}-${EnvironmentName}-sg
+
+
+
+  ApiELBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId:
+        Fn::ImportValue:
+          Fn::Sub: ${ProjectName}-${EnvironmentName}-VpcId
+      GroupDescription: SG for ALB
+      SecurityGroupIngress:
+        - CidrIp: "0.0.0.0/0"
+          IpProtocol: "TCP"
+          FromPort: 80
+          ToPort: 80
+        - CidrIp: "0.0.0.0/0"
+          IpProtocol: "TCP"
+          FromPort: 443
+          ToPort: 443
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-${ServiceName}-${EnvironmentName}-elb-sg
+
+
+
+Outputs:
+  ApiApplicationSecurityGroup:
+    Value: !Ref ApiApplicationSecurityGroup
+    # Export:
+    #   Name: !Sub ${ProjectName}-ApiApplicationSecurityGroup
+
+  ApiELBSecurityGroup:
+    Value: !Ref ApiELBSecurityGroup
+    # Export:
+    #   Name: !Sub ${ProjectName}-ApiELBSecurityGroup
+

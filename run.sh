@@ -5,48 +5,44 @@ PROJECT_NAME=cloudformation-handson
 KEY_PAIR_NAME=cloudformation-handson
 ENVIORNMENT_NAME=dev
 PROFILE=cloudformation-handson
+# かぶらないもの
 APP_S3_BUCKET=cloudformation-hands-on-api
 APP_S3_KEY=sample.zip
 SERVICE_NAME=api
 PRIVATE_DOMAIN_NAME=private-cloudformation-handson.com
 DOMAIN_NAME=public-cloudformation-handson.com
+# かぶらないもの
 CLOUDFORMATION_TEMPLATE_BUCKET=cloudformation-hands-on-resource
+if [[ -z $(aws s3api head-bucket --bucket $CLOUDFORMATION_TEMPLATE_BUCKET --profile $PROFILE) ]]; then
+        echo "bucket exists${CLOUDFORMATION_TEMPLATE_BUCKET}"
+else
+  aws s3api create-bucket \
+    --bucket $CLOUDFORMATION_TEMPLATE_BUCKET \
+    --region ap-northeast-1 \
+    --profile $PROFILE \
+    --create-bucket-configuration LocationConstraint=ap-northeast-1
+fi
 
-isALreadyExistStack(){
-  # $1 is argument for function
-  local response=$(aws cloudformation describe-stacks --stack-name $1 --profile $PROFILE)
-  local result=$(echo $response | tr -d '[:space:]' | grep StackId | wc -c)
-  # return string
-  echo $result
-}
+if [[ -z $(aws s3api head-bucket --bucket $APP_S3_BUCKET --profile $PROFILE) ]]; then
+        echo "bucket exists${APP_S3_BUCKET}"
+else
+  aws s3api create-bucket \
+    --bucket $APP_S3_BUCKET \
+    --region ap-northeast-1 \
+    --profile $PROFILE \
+    --create-bucket-configuration LocationConstraint=ap-northeast-1
+  aws s3api wait bucket-exists \
+    --bucket $APP_S3_BUCKET
+  aws s3 cp ${APP_S3_KEY} s3://${APP_S3_BUCKET}/ \
+    --profile=$PROFILE \
+    --region ap-northeast-1
+fi
 
-showOutputs(){
-  # $1 is argument for function
-  local response=$(aws cloudformation describe-stacks --stack-name $1 --profile $PROFILE | jq -r '.Stacks[].Outputs[]')
-  echo $response
-}
-
-
-aws s3api create-bucket \
-  --bucket $CLOUDFORMATION_TEMPLATE_BUCKET \
-  --region ap-northeast-1 \
-  --profile $PROFILE \
-  --create-bucket-configuration LocationConstraint=ap-northeast-1
-
-aws s3api create-bucket \
-  --bucket $APP_S3_BUCKET \
-  --region ap-northeast-1 \
-  --profile $PROFILE \
-  --create-bucket-configuration LocationConstraint=ap-northeast-1
-
-aws s3 cp ${APP_S3_KEY} s3://${APP_S3_BUCKET}/ \
-  --profile=$PROFILE \
-  --region ap-northeast-1
 
 #----------------------------------------------------------
 #  vpc
 #----------------------------------------------------------
-if test `isALreadyExistStack ${PROJECT_NAME}-${ENVIORNMENT_NAME}-vpc` -ne 0;then
+if aws cloudformation describe-stacks --profile $PROFILE --stack-name ${PROJECT_NAME}-${ENVIORNMENT_NAME}-vpc ; then
   # すでに存在するものへの変更
   aws cloudformation deploy \
     --template-file vpc.yml \
@@ -57,7 +53,6 @@ if test `isALreadyExistStack ${PROJECT_NAME}-${ENVIORNMENT_NAME}-vpc` -ne 0;then
     ProjectName=$PROJECT_NAME \
     EnvironmentName=$ENVIORNMENT_NAME \
     KeyPairName=$KEY_PAIR_NAME
-  showOutputs ${PROJECT_NAME}-${ENVIORNMENT_NAME}-vpc
 else
   # なかったら作成する
   aws cloudformation create-stack \
@@ -69,14 +64,15 @@ else
     ParameterKey=ProjectName,ParameterValue=$PROJECT_NAME \
     ParameterKey=EnvironmentName,ParameterValue=$ENVIORNMENT_NAME \
     ParameterKey=KeyPairName,ParameterValue=$KEY_PAIR_NAME
-  showOutputs ${PROJECT_NAME}-${ENVIORNMENT_NAME}-vpc
+  aws cloudformation wait stack-create-complete \
+    --stack-name ${PROJECT_NAME}-${ENVIORNMENT_NAME}-vpc
 fi
 
 
 #----------------------------------------------------------
 #  dns depends on vpc
 #----------------------------------------------------------
-if test `isALreadyExistStack ${PROJECT_NAME}-${ENVIORNMENT_NAME}-dns` -ne 0;then
+if aws cloudformation describe-stacks --profile $PROFILE --stack-name ${PROJECT_NAME}-${ENVIORNMENT_NAME}-dns ; then
   # すでに存在するものへの変更
   aws cloudformation deploy \
     --template-file route53.yml \
@@ -86,7 +82,6 @@ if test `isALreadyExistStack ${PROJECT_NAME}-${ENVIORNMENT_NAME}-dns` -ne 0;then
     --parameter-overrides \
     ProjectName=$PROJECT_NAME \
     EnvironmentName=$ENVIORNMENT_NAME
-  showOutputs ${PROJECT_NAME}-${ENVIORNMENT_NAME}-dns
 else
   # なかったら作成する
   aws cloudformation create-stack \
@@ -99,13 +94,14 @@ else
     ParameterKey=DomainName,ParameterValue=${DOMAIN_NAME}. \
     ParameterKey=PrivateDomainName,ParameterValue=${PRIVATE_DOMAIN_NAME}. \
     ParameterKey=EnvironmentName,ParameterValue=$ENVIORNMENT_NAME
-  showOutputs ${PROJECT_NAME}-${ENVIORNMENT_NAME}-dns
+  aws cloudformation wait stack-create-complete \
+    --stack-name ${PROJECT_NAME}-${ENVIORNMENT_NAME}-dns
 fi
 
 #----------------------------------------------------------
 #  db dependds on db
 #----------------------------------------------------------
-if test `isALreadyExistStack ${PROJECT_NAME}-${ENVIORNMENT_NAME}-db` -ne 0;then
+if aws cloudformation describe-stacks --profile $PROFILE --stack-name ${PROJECT_NAME}-${ENVIORNMENT_NAME}-db ; then
   # すでに存在するものへの変更
   aws cloudformation deploy \
     --template-file db.yml \
@@ -115,7 +111,6 @@ if test `isALreadyExistStack ${PROJECT_NAME}-${ENVIORNMENT_NAME}-db` -ne 0;then
     --parameter-overrides \
     ProjectName=$PROJECT_NAME \
     EnvironmentName=$ENVIORNMENT_NAME
-  showOutputs ${PROJECT_NAME}-${ENVIORNMENT_NAME}-db
 else
   # なかったら作成する
   aws cloudformation create-stack \
@@ -129,7 +124,8 @@ else
     ParameterKey=DatabaseName,ParameterValue=DatabaseName \
     ParameterKey=DatabaseUser,ParameterValue=DatabaseUser \
     ParameterKey=DatabasePassword,ParameterValue=DatabasePassword
-  showOutputs ${PROJECT_NAME}-${ENVIORNMENT_NAME}-db
+  aws cloudformation wait stack-create-complete \
+    --stack-name ${PROJECT_NAME}-${ENVIORNMENT_NAME}-db
 fi
 
 
@@ -142,7 +138,7 @@ aws cloudformation package \
   --s3-bucket $CLOUDFORMATION_TEMPLATE_BUCKET \
   --output-template-file ./api/output.yml \
   --profile $PROFILE
-if test `isALreadyExistStack ${PROJECT_NAME}-${ENVIORNMENT_NAME}-${SERVICE_NAME}` -ne 0;then
+if aws cloudformation describe-stacks --profile $PROFILE --stack-name ${PROJECT_NAME}-${ENVIORNMENT_NAME}-${SERVICE_NAME} ; then
   # すでに存在するものへの変更
   aws cloudformation deploy \
     --template-file ${PWD}/api/output.yml \
@@ -154,7 +150,6 @@ if test `isALreadyExistStack ${PROJECT_NAME}-${ENVIORNMENT_NAME}-${SERVICE_NAME}
     EnvironmentName=$ENVIORNMENT_NAME \
     ServiceName=$SERVICE_NAME
     KeyPairName=$KEY_PAIR_NAME
-  showOutputs residential-map-api
 else
   # なかったら作成する
   aws cloudformation create-stack \
@@ -174,5 +169,6 @@ else
     ParameterKey=DatabaseUser,ParameterValue=DatabaseUser \
     ParameterKey=DatabasePassword,ParameterValue=DatabasePassword \
     ParameterKey=GitHubToken,ParameterValue=GitHubToken
-  showOutputs ${PROJECT_NAME}-${ENVIORNMENT_NAME}-${SERVICE_NAME}
+  aws cloudformation wait stack-update-complete \
+    --stack-name ${PROJECT_NAME}-${ENVIORNMENT_NAME}-${SERVICE_NAME}
 fi

@@ -169,6 +169,6 @@ else
     ParameterKey=DatabaseUser,ParameterValue=DatabaseUser \
     ParameterKey=DatabasePassword,ParameterValue=DatabasePassword \
     ParameterKey=GitHubToken,ParameterValue=GitHubToken
-  aws cloudformation wait stack-update-complete \
+  aws cloudformation wait stack-create-complete \
     --stack-name ${PROJECT_NAME}-${ENVIORNMENT_NAME}-${SERVICE_NAME}
 fi

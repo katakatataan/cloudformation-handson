@@ -9,7 +9,7 @@ Parameters:
 
   DatabaseUser:
     NoEcho: true
-    Type: AWS::SSM::Parameter::Name
+    Type: AWS::SSM::Parameter::Value<String>
     Description: Database admin account name
     MinLength: 5
     MaxLength: 16
@@ -18,7 +18,7 @@ Parameters:
 
   DatabasePassword:
     NoEcho: true
-    Type: AWS::SSM::Parameter::Name
+    Type: AWS::SSM::Parameter::Value<String>
     Description: Database admin account password
     MinLength: 6
     MaxLength: 41
@@ -27,7 +27,7 @@ Parameters:
 
   DatabaseName:
     NoEcho: true
-    Type: AWS::SSM::Parameter::Name
+    Type: AWS::SSM::Parameter::Value<String>
     Description: Database name
     MinLength: 1
     MaxLength: 30
@@ -220,9 +220,9 @@ Resources:
       VPCSecurityGroups:
         - !Ref DatabaseSecurityGroup
       Engine: !Ref DatabaseEngine
-      DBName: !Sub '{{resolve:ssm:${DatabaseName}:1}}'
-      MasterUsername: !Sub '{{resolve:ssm:${DatabaseUser}:1}}'
-      MasterUserPassword: !Sub '{{resolve:ssm-secure:${DatabasePassword}:1}}'
+      DBName: !Ref DatabaseName
+      MasterUsername: !Ref DatabaseUser
+      MasterUserPassword: !Ref DatabasePassword
       DBInstanceClass: !Ref DatabaseInstanceClass
       AllocatedStorage: !Ref DatabaseSize
       StorageType: gp2

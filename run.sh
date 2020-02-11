@@ -13,19 +13,17 @@ PRIVATE_DOMAIN_NAME=private-cloudformation-handson.com
 DOMAIN_NAME=public-cloudformation-handson.com
 # かぶらないもの
 CLOUDFORMATION_TEMPLATE_BUCKET=cloudformation-hands-on-resource
-if [[ -z $(aws s3api head-bucket --bucket $CLOUDFORMATION_TEMPLATE_BUCKET --profile $PROFILE) ]]; then
-        echo "bucket exists${CLOUDFORMATION_TEMPLATE_BUCKET}"
-else
+if aws s3 ls "s3://$CLOUDFORMATION_TEMPLATE_BUCKET" 2>&1 | grep -q 'An error occurred'; then
   aws s3api create-bucket \
     --bucket $CLOUDFORMATION_TEMPLATE_BUCKET \
     --region ap-northeast-1 \
     --profile $PROFILE \
     --create-bucket-configuration LocationConstraint=ap-northeast-1
+else
+        echo "bucket exists${CLOUDFORMATION_TEMPLATE_BUCKET}"
 fi
 
-if [[ -z $(aws s3api head-bucket --bucket $APP_S3_BUCKET --profile $PROFILE) ]]; then
-        echo "bucket exists${APP_S3_BUCKET}"
-else
+if aws s3 ls "s3://$APP_S3_BUCKET" 2>&1 | grep -q 'An error occurred'; then
   aws s3api create-bucket \
     --bucket $APP_S3_BUCKET \
     --region ap-northeast-1 \
@@ -33,6 +31,11 @@ else
     --create-bucket-configuration LocationConstraint=ap-northeast-1
   aws s3api wait bucket-exists \
     --bucket $APP_S3_BUCKET
+  aws s3 cp ${APP_S3_KEY} s3://${APP_S3_BUCKET}/ \
+    --profile=$PROFILE \
+    --region ap-northeast-1
+else
+  echo "bucket exists${APP_S3_BUCKET}"
   aws s3 cp ${APP_S3_KEY} s3://${APP_S3_BUCKET}/ \
     --profile=$PROFILE \
     --region ap-northeast-1
@@ -120,10 +123,10 @@ else
     --profile $PROFILE \
     --parameters \
     ParameterKey=ProjectName,ParameterValue=$PROJECT_NAME \
-    ParameterKey=EnvironmentName,ParameterValue=$ENVIORNMENT_NAME \
     ParameterKey=DatabaseName,ParameterValue=DatabaseName \
     ParameterKey=DatabaseUser,ParameterValue=DatabaseUser \
-    ParameterKey=DatabasePassword,ParameterValue=DatabasePassword
+    ParameterKey=DatabasePassword,ParameterValue=DatabasePassword \
+    ParameterKey=EnvironmentName,ParameterValue=$ENVIORNMENT_NAME
   aws cloudformation wait stack-create-complete \
     --stack-name ${PROJECT_NAME}-${ENVIORNMENT_NAME}-db
 fi

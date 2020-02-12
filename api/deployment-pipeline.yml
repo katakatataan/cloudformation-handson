@@ -43,6 +43,7 @@ Parameters:
 Resources:
   Repository:
     Type: AWS::ECR::Repository
+    DeletionPolicy: Retain
     Properties:
       RepositoryName: !Ref ECRRepositoryName
 
@@ -81,6 +82,7 @@ Resources:
 
   ArtifactBucket:
     Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
 
   CodeBuildProject:
     Type: AWS::CodeBuild::Project

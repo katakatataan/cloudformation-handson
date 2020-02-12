@@ -138,7 +138,7 @@ Resources:
     Type: AWS::ElasticBeanstalk::ConfigurationTemplate
     Properties:
       ApplicationName: !Ref Application
-      SolutionStackName: 64bit Amazon Linux 2018.03 v2.12.9 running Docker 18.06.1-ce
+      SolutionStackName: 64bit Amazon Linux 2018.03 v2.14.1 running Docker 18.09.9-ce
       OptionSettings:
 
       - Namespace: aws:elasticbeanstalk:environment

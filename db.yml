@@ -162,7 +162,6 @@ Parameters:
       - false
 
   DBDomainName:
-    Default: db.private-cloudformation-handson.com
     Type: String
 
 Conditions:

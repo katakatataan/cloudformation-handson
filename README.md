@@ -113,9 +113,11 @@ export DOMAIN_NAME=public-cloudformation-handson.com
 ## 8. cloudformationで今回のhandson環境を作成します。
 
 下記のコマンドを実行して、スタックが作成されるまで待ちます。
+
 かなり時間がかかります。
 
 注意点
+
 ※ スタックのステータスがCREATE_COMPELTEとCREATE_IN_PROGRESS以外の場合はスタックをaws コンソールから手動で削除してやり直してみてください。
 
 [aws cloudformation console](https://ap-northeast-1.console.aws.amazon.com/cloudformation/home?region=ap-northeast-1#/stacks?filteringText=&filteringStatus=active&viewNested=true&hideStacks=false

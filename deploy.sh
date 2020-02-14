@@ -24,6 +24,12 @@ databasePassword=$(aws ssm get-parameters --names "DatabasePassword" --profile $
 if [ ! $databasePassword = "DatabasePassword" ]; then
   echo "Parameter Store: DatabasePassword Not Exist"
   exit 1
+else
+  dbMinPassword=7
+  databasePasswordValue=$(aws ssm get-parameters --names "DatabasePassword" --profile $PROFILE --region ap-northeast-1 | jq -r ".Parameters[0].Value")
+  if [ ${#databasePasswordValue} -le $dbMinPassword ]; then
+    echo "Parameter Store: DatabasePassword length should over ${dbMinPassword}"
+  fi
 fi
 databaseUser=$(aws ssm get-parameters --names "DatabaseUser" --profile $PROFILE --region ap-northeast-1 | jq -r ".Parameters[0].Name")
 if [ ! $databaseUser = "DatabaseUser" ]; then

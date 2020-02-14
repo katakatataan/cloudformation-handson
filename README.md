@@ -41,8 +41,10 @@ aws-cli/1.17.17 Python/3.8.1 Darwin/19.2.0 botocore/1.14.17
 https://console.aws.amazon.com/iam/home?#/users/{作成したIAMUser名}?section=security_credentials
 
 表示された
+```
 アクセスキー
 シークレットアクセスキー
+```
 をメモしてください。
 
 
@@ -68,6 +70,7 @@ Default output format [None]: json
 ## 6. aws ec2 キーペアを作成してください。
 
 ec2キーペアはbastionとebの内部のec2インスタンスに使用します。
+
 下記のリンクにアクセスして作成してください。
 
 https://ap-northeast-1.console.aws.amazon.com/ec2/v2/home?region=ap-northeast-1#KeyPairs:
@@ -76,6 +79,7 @@ https://ap-northeast-1.console.aws.amazon.com/ec2/v2/home?region=ap-northeast-1#
 ## 7. 環境変数のセット
 
 上記までの作業で得られた情報も踏まえて環境変数をセットしてください。
+
 説明はコメントで記載しています
 
 ```shellscript:env.sh
@@ -113,9 +117,12 @@ export DOMAIN_NAME=public-cloudformation-handson.com
 
 注意点
 ※ スタックのステータスがCREATE_COMPELTEとCREATE_IN_PROGRESS以外の場合はスタックをaws コンソールから手動で削除してやり直してみてください。
+
 [aws cloudformation console](https://ap-northeast-1.console.aws.amazon.com/cloudformation/home?region=ap-northeast-1#/stacks?filteringText=&filteringStatus=active&viewNested=true&hideStacks=false
 )
+
 ※ 途中でctrl+c でストップしても、cloudformationのステータスがCREATE_IN_PROGRESS, CREATE_COMPELTEなら再度 ./deploy.sh をやり直すだけです。
+
 ※ 一応冪等性をそこそこ担保して作ってるので、何回再実行しても複数リソースは作られません。
 
 ```
@@ -129,6 +136,7 @@ chmod +x deploy.sh
 ECRは手動で消す以外にうまい方法がないのでまず元にECRを手動で削除します。
 
 https://ap-northeast-1.console.aws.amazon.com/ecr/repositories?region=ap-northeast-1
+
 ecr名: ${PROJECT_NAME}-${SERVICE_NAME}-${ENVIORNMENT_NAME}
 
 次に下記のdelete.shを実行してスタックが削除されるまで待ちます。

@@ -46,7 +46,7 @@ https://console.aws.amazon.com/iam/home?#/users/{作成したIAMUser名}?section
 をメモしてください。
 
 
-5.  awsのクレデンシャルのセット
+## 5.  awsのクレデンシャルのセット
 
 下記のコマンドを実行してください。
 
@@ -65,7 +65,7 @@ Default region name [None]: ap-northeast-1
 Default output format [None]: json
 ```
 
-6. aws ec2 キーペアを作成してください。
+## 6. aws ec2 キーペアを作成してください。
 
 ec2キーペアはbastionとebの内部のec2インスタンスに使用します。
 下記のリンクにアクセスして作成してください。
@@ -73,7 +73,7 @@ ec2キーペアはbastionとebの内部のec2インスタンスに使用しま�
 https://ap-northeast-1.console.aws.amazon.com/ec2/v2/home?region=ap-northeast-1#KeyPairs:
 
 
-7. 環境変数のセット
+## 7. 環境変数のセット
 
 上記までの作業で得られた情報も踏まえて環境変数をセットしてください。
 説明はコメントで記載しています
@@ -106,7 +106,7 @@ export DOMAIN_NAME=public-cloudformation-handson.com
 ```
 
 
-8. cloudformationで今回のhandson環境を作成します。
+## 8. cloudformationで今回のhandson環境を作成します。
 
 下記のコマンドを実行して、スタックが作成されるまで待ちます。
 かなり時間がかかります。
@@ -124,7 +124,7 @@ chmod +x deploy.sh
 ```
 
 
-9. 環境の削除
+## 9. 環境の削除
 
 ECRは手動で消す以外にうまい方法がないのでまず元にECRを手動で削除します。
 

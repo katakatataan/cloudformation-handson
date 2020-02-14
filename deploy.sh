@@ -79,7 +79,7 @@ fi
 echo '------------------------------------------------------------------------------------------'
 echo 'create vpc'
 echo '------------------------------------------------------------------------------------------'
-if ! aws cloudformation describe-stacks --profile $PROFILE --region ap-northeast-1 --stack-name ${PROJECT_NAME}-${ENVIORNMENT_NAME}-vpc 2>&1 1>/dev/null | grep error; then
+if ! aws cloudformation describe-stacks --profile $PROFILE --region ap-northeast-1 --stack-name ${PROJECT_NAME}-${ENVIORNMENT_NAME}-vpc 2>&1 | grep -q 'An error occurred'; then
   # すでに存在するものへの変更
   echo "stack-name: ${PROJECT_NAME}-${ENVIORNMENT_NAME}-vpc is already exist"
   stackStatus=$(aws cloudformation describe-stacks --profile $PROFILE --region ap-northeast-1 --stack-name ${PROJECT_NAME}-${ENVIORNMENT_NAME}-vpc| jq -r ".Stacks[0].StackStatus")
@@ -136,7 +136,7 @@ fi
 echo '------------------------------------------------------------------------------------------'
 echo 'create dns'
 echo '------------------------------------------------------------------------------------------'
-if ! aws cloudformation describe-stacks --profile $PROFILE --region ap-northeast-1 --stack-name ${PROJECT_NAME}-${ENVIORNMENT_NAME}-dns 2>&1 1>/dev/null | grep error; then
+if ! aws cloudformation describe-stacks --profile $PROFILE --region ap-northeast-1 --stack-name ${PROJECT_NAME}-${ENVIORNMENT_NAME}-dns 2>&1 | grep -q 'An error occurred'; then
   # すでに存在するものへの変更
   echo "stack-name: ${PROJECT_NAME}-${ENVIORNMENT_NAME}-dns is already exist"
   stackStatus=$(aws cloudformation describe-stacks --profile $PROFILE --region ap-northeast-1 --stack-name ${PROJECT_NAME}-${ENVIORNMENT_NAME}-dns | jq -r ".Stacks[0].StackStatus")
@@ -192,7 +192,7 @@ fi
 echo '------------------------------------------------------------------------------------------'
 echo 'create db'
 echo '------------------------------------------------------------------------------------------'
-if ! aws cloudformation describe-stacks --profile $PROFILE --region ap-northeast-1 --stack-name ${PROJECT_NAME}-${ENVIORNMENT_NAME}-db 2>&1 1>/dev/null | grep error; then
+if ! aws cloudformation describe-stacks --profile $PROFILE --region ap-northeast-1 --stack-name ${PROJECT_NAME}-${ENVIORNMENT_NAME}-db 2>&1 | grep -q 'An error occurred'; then
   # すでに存在するものへの変更
   echo "stack-name: ${PROJECT_NAME}-${ENVIORNMENT_NAME}-db already exist"
   stackStatus=$(aws cloudformation describe-stacks --profile $PROFILE --region ap-northeast-1 --stack-name ${PROJECT_NAME}-${ENVIORNMENT_NAME}-db| jq -r ".Stacks[0].StackStatus")
@@ -258,7 +258,7 @@ aws cloudformation package \
   --region ap-northeast-1 \
   --output-template-file ./api/output.yml \
   --profile $PROFILE
-if ! aws cloudformation describe-stacks --profile $PROFILE --region ap-northeast-1 --stack-name ${PROJECT_NAME}-${ENVIORNMENT_NAME}-${SERVICE_NAME} 2>&1 1>/dev/null | grep error; then
+if ! aws cloudformation describe-stacks --profile $PROFILE --region ap-northeast-1 --stack-name ${PROJECT_NAME}-${ENVIORNMENT_NAME}-${SERVICE_NAME} 2>&1 | grep -q 'An error occurred'; then
   # すでに存在するものへの変更
   echo "stack-name: ${PROJECT_NAME}-${ENVIORNMENT_NAME}-${SERVICE_NAME} already exist"
   stackStatus=$(aws cloudformation describe-stacks --profile $PROFILE --region ap-northeast-1 --stack-name ${PROJECT_NAME}-${ENVIORNMENT_NAME}-${SERVICE_NAME}| jq -r ".Stacks[0].StackStatus")

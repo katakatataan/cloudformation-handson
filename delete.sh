@@ -3,17 +3,11 @@
 source env.sh
 
 export PROJECT_NAME
-export KEY_PAIR_NAME
 export ENVIORNMENT_NAME
 export PROFILE
 export APP_S3_BUCKET
-export APP_S3_KEY
 export SERVICE_NAME
-export PRIVATE_DOMAIN_NAME
-export DOMAIN_NAME
-export DB_PRIVATE_DOMAIN_NAME
 export CLOUDFORMATION_TEMPLATE_S3_BUCKET
-export CODEPIPELINE_ARTIFACT_S3_BACKET_NAME
 
 
 echo '------------------------------------------------------------------------------------------'
@@ -54,7 +48,7 @@ echo 'https://ap-northeast-1.console.aws.amazon.com/ecr/repositories?region=ap-n
 echo '------------------------------------------------------------------------------------------'
 echo 'delete api stack'
 echo '------------------------------------------------------------------------------------------'
-if ! aws cloudformation describe-stacks --profile $PROFILE --region ap-northeast-1 --stack-name ${PROJECT_NAME}-${ENVIORNMENT_NAME}-${SERVICE_NAME} 2>&1 1>/dev/null | grep error; then
+if ! aws cloudformation describe-stacks --profile $PROFILE --region ap-northeast-1 --stack-name ${PROJECT_NAME}-${ENVIORNMENT_NAME}-${SERVICE_NAME} 2>&1 | grep -q 'An error occurred'; then
   stackStatus=$(aws cloudformation describe-stacks --profile $PROFILE --region ap-northeast-1 --stack-name ${PROJECT_NAME}-${ENVIORNMENT_NAME}-${SERVICE_NAME}| jq -r ".Stacks[0].StackStatus")
   echo "stackStatus: $stackStatus"
   echo "stackName: ${PROJECT_NAME}-${ENVIORNMENT_NAME}-${SERVICE_NAME} wait for delete"
@@ -71,7 +65,7 @@ fi
 echo '------------------------------------------------------------------------------------------'
 echo 'delete db stack'
 echo '------------------------------------------------------------------------------------------'
-if ! aws cloudformation describe-stacks --profile $PROFILE --region ap-northeast-1 --stack-name ${PROJECT_NAME}-${ENVIORNMENT_NAME}-db 2>&1 1>/dev/null | grep error; then
+if ! aws cloudformation describe-stacks --profile $PROFILE --region ap-northeast-1 --stack-name ${PROJECT_NAME}-${ENVIORNMENT_NAME}-db 2>&1 | grep -q 'An error occurred'; then
   stackStatus=$(aws cloudformation describe-stacks --profile $PROFILE --region ap-northeast-1 --stack-name ${PROJECT_NAME}-${ENVIORNMENT_NAME}-db| jq -r ".Stacks[0].StackStatus")
   echo "stackStatus: $stackStatus"
   echo "stackName: ${PROJECT_NAME}-${ENVIORNMENT_NAME}-db wait for delete"
@@ -88,7 +82,7 @@ fi
 echo '------------------------------------------------------------------------------------------'
 echo 'delete dns stack'
 echo '------------------------------------------------------------------------------------------'
-if ! aws cloudformation describe-stacks --profile $PROFILE --region ap-northeast-1 --stack-name ${PROJECT_NAME}-${ENVIORNMENT_NAME}-dns 2>&1 1>/dev/null | grep error; then
+if ! aws cloudformation describe-stacks --profile $PROFILE --region ap-northeast-1 --stack-name ${PROJECT_NAME}-${ENVIORNMENT_NAME}-dns 2>&1 | grep -q 'An error occurred'; then
   stackStatus=$(aws cloudformation describe-stacks --profile $PROFILE --region ap-northeast-1 --stack-name ${PROJECT_NAME}-${ENVIORNMENT_NAME}-dns| jq -r ".Stacks[0].StackStatus")
   echo "stackStatus: $stackStatus"
   echo "stackName: ${PROJECT_NAME}-${ENVIORNMENT_NAME}-dns wait for delete"
@@ -105,7 +99,7 @@ fi
 echo '------------------------------------------------------------------------------------------'
 echo 'delete vpc stack'
 echo '------------------------------------------------------------------------------------------'
-if ! aws cloudformation describe-stacks --profile $PROFILE --region ap-northeast-1 --stack-name ${PROJECT_NAME}-${ENVIORNMENT_NAME}-vpc 2>&1 1>/dev/null | grep error; then
+if ! aws cloudformation describe-stacks --profile $PROFILE --region ap-northeast-1 --stack-name ${PROJECT_NAME}-${ENVIORNMENT_NAME}-vpc 2>&1 | grep -q 'An error occurred'; then
   stackStatus=$(aws cloudformation describe-stacks --profile $PROFILE --region ap-northeast-1 --stack-name ${PROJECT_NAME}-${ENVIORNMENT_NAME}-vpc| jq -r ".Stacks[0].StackStatus")
   echo "stackStatus: $stackStatus"
   echo "stackName: ${PROJECT_NAME}-${ENVIORNMENT_NAME}-vpc wait for delete"

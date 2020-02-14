@@ -82,10 +82,10 @@ https://ap-northeast-1.console.aws.amazon.com/ec2/v2/home?region=ap-northeast-1#
 # 変更しても良い:自分の任意のプロジェクト名に変更
 export PROJECT_NAME=cloudformation-handson
 # 要変更: 自分で作成したec2 keypair名に変更
-export KEY_PAIR_NAME=cloudformation-handson-matsuyay
+export KEY_PAIR_NAME=cloudformation-handson
 # 変更しても良い: ただしdevかprod しか選択できない。
 export ENVIORNMENT_NAME=dev
-# aws configure --profile プロファイル名 のプロファイル名に指定したものに変更
+# aws configure --profile {任意のprofile名} の{任意のprofile名}に指定したものに変更
 export PROFILE=cloudhandson
 # 要変更:s3 は全世界で一意のかぶらないものに変更
 export APP_S3_BUCKET=app-s3-bucket-cloudformation-hands-on-api

@@ -1,7 +1,7 @@
 # 変更しても良い:自分の任意のプロジェクト名に変更
 export PROJECT_NAME=cloudformation-handson
 # 要変更: 自分で作成したec2 keypair名に変更
-export KEY_PAIR_NAME=cloudformation-handson-matsuyay
+export KEY_PAIR_NAME=cloudformation-handson
 # 変更しても良い: ただしdevかprod しか選択できない。
 export ENVIORNMENT_NAME=dev
 # aws configure --profile プロファイル名 のプロファイル名に指定したものに変更

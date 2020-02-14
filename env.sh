@@ -4,7 +4,7 @@ export PROJECT_NAME=cloudformation-handson
 export KEY_PAIR_NAME=cloudformation-handson
 # 変更しても良い: ただしdevかprod しか選択できない。
 export ENVIORNMENT_NAME=dev
-# aws configure --profile プロファイル名 のプロファイル名に指定したものに変更
+# 要変更:aws configure --profile プロファイル名 のプロファイル名に指定したものに変更
 export PROFILE=cloudhandson
 # 要変更:s3 は全世界で一意のかぶらないものに変更
 export APP_S3_BUCKET=app-s3-bucket-cloudformation-hands-on-api

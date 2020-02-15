@@ -6,9 +6,10 @@
 4. get aws api key
 5. set aws api key to aws credentials
 6. create ec2 key pair
-7. set your environment
-8. run cloudformation
-9. finish operation. delete cloudformation
+7. create parameter store [GitHubToken, DatabaseUser, DatabaseName, DatabasePassword]
+8. set your environment
+9. run cloudformation
+10. finish operation. delete cloudformation
 
 
 
@@ -75,8 +76,54 @@ ec2キーペアはbastionとebの内部のec2インスタンスに使用しま�
 
 https://ap-northeast-1.console.aws.amazon.com/ec2/v2/home?region=ap-northeast-1#KeyPairs:
 
+## 7. パラメータストアの理解も含めて手動でparameter storeを作成します。
 
-## 7. 環境変数のセット
+GiHubToken, DatabaseName, DatabaseUser, DatabasePassword の4つのパラメータを作成します。
+
+
+GithubTokenに関しては、GitHubにアクセスして、Generate new tokenを押して作成してください。
+
+下記のリンクにアクセスして作成してください。
+
+※　すでに取得している人はそちらを使用してください。
+
+権限は今回のhandsonではpublic repositoryのcloneのみを行いますので、
+
+public_repoのみで大丈夫です。
+
+[GitHub Token取得ページ](https://github.com/settings/tokens)
+
+https://ap-northeast-1.console.aws.amazon.com/systems-manager/parameters?region=ap-northeast-1
+
+手順は下記の通りです。
+
+1. パラメータの作成
+2. 名前:[GitHubToken]
+3. 利用枠:[標準]
+4. タイプ:文字列
+5. タイプ: GitHubの個人のアクセストークン
+
+1. パラメータの作成
+2. 名前:[DatabaseName]
+3. 利用枠:[標準]
+4. タイプ:文字列
+5. タイプ:任意の名前のデータベース名(RDSに使用されます。)
+
+1. パラメータの作成
+2. 名前:[DatabaseUser]
+3. 利用枠:[標準]
+4. タイプ:文字列
+5. タイプ:任意の名前のデータベース名(RDSに使用されます。)
+
+1. パラメータの作成
+2. 名前:[DatabasePassword]
+3. 利用枠:[標準]
+4. タイプ:文字列[7文字以上]
+5. タイプ:任意の名前のデータベース名(RDSに使用されます。)
+
+
+
+## 8. 環境変数のセット
 
 上記までの作業で得られた情報も踏まえて環境変数をセットしてください。
 
@@ -110,7 +157,7 @@ export DOMAIN_NAME=public-cloudformation-handson.com
 ```
 
 
-## 8. cloudformationで今回のhandson環境を作成します。
+## 9. cloudformationで今回のhandson環境を作成します。
 
 下記のコマンドを実行して、スタックが作成されるまで待ちます。
 
@@ -133,7 +180,7 @@ chmod +x deploy.sh
 ```
 
 
-## 9. 環境の削除
+## 10. 環境の削除
 
 ECRは手動で消す以外にうまい方法がないのでまず元にECRを手動で削除します。
 

@@ -78,6 +78,7 @@ https://ap-northeast-1.console.aws.amazon.com/ec2/v2/home?region=ap-northeast-1#
 
 ## 7. パラメータストアの理解も含めて手動でparameter storeを作成します。
 
+<<<<<<< HEAD
 GiHubToken, DatabaseName, DatabaseUser, DatabasePassword の4つのパラメータを作成します。
 
 
@@ -123,11 +124,17 @@ https://ap-northeast-1.console.aws.amazon.com/systems-manager/parameters?region=
 
 
 
-## 8. 環境変数のセット
+## 8. 変数のセット
 
-上記までの作業で得られた情報も踏まえて環境変数をセットしてください。
+上記までの作業で得られた情報も踏まえて変数をセットしてください。
 
 説明はコメントで記載しています
+
+ファイル名は
+
+env.sh
+
+です。
 
 ```shellscript:env.sh
 # 変更しても良い:自分の任意のプロジェクト名に変更

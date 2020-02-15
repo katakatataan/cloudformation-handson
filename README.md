@@ -6,7 +6,7 @@
 4. get aws api key
 5. set aws api key to aws credentials
 6. create ec2 key pair
-7. set your environment
+7. set your variables
 8. run cloudformation
 9. finish operation. delete cloudformation
 
@@ -76,11 +76,17 @@ ec2キーペアはbastionとebの内部のec2インスタンスに使用しま�
 https://ap-northeast-1.console.aws.amazon.com/ec2/v2/home?region=ap-northeast-1#KeyPairs:
 
 
-## 7. 環境変数のセット
+## 7. 変数のセット
 
-上記までの作業で得られた情報も踏まえて環境変数をセットしてください。
+上記までの作業で得られた情報も踏まえて変数をセットしてください。
 
 説明はコメントで記載しています
+
+ファイル名は
+
+env.sh
+
+です。
 
 ```shellscript:env.sh
 # 変更しても良い:自分の任意のプロジェクト名に変更

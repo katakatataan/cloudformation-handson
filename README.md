@@ -78,7 +78,6 @@ https://ap-northeast-1.console.aws.amazon.com/ec2/v2/home?region=ap-northeast-1#
 
 ## 7. パラメータストアの理解も含めて手動でparameter storeを作成します。
 
-<<<<<<< HEAD
 GiHubToken, DatabaseName, DatabaseUser, DatabasePassword の4つのパラメータを作成します。
 
 
